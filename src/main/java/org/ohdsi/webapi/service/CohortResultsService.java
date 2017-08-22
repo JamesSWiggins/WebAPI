@@ -1779,6 +1779,45 @@ public class CohortResultsService extends AbstractDaoService {
         
         return el;
     }
+
+    public List<AnalysisResults> getCohortAnalysesTimeliness(final int id, String sourceKey) {
+        
+        String sql = null;
+        sql = ResourceHelper.GetResourceAsString("/resources/cohortresults/sql/timeliness/getTimeliness.sql");
+        
+        Source source = getSourceRepository().findBySourceKey(sourceKey);
+        String resultsTableQualifier = source.getTableQualifier(SourceDaimon.DaimonType.Results);
+        
+        String[] searchStringNames = new String[] { "tableQualifier", };
+        String[] replacementNames = new String[] { resultsTableQualifier };
+        
+        String[] variableNames = new String[] { "cohortDefinitionId" };
+        Object[] variableValues = new Object[] { id };
+        
+        AnalysisResultsMapper arm = new AnalysisResultsMapper();
+        
+        PreparedStatementRenderer psr = new PreparedStatementRenderer(source, sql, searchStringNames, replacementNames,
+                variableNames, variableValues);
+        return getSourceJdbcTemplate(source).query(psr.getSql(), psr.getSetter(), arm);
+    }
+    
+    @GET
+    @Path("{sourceKey}/{id}/timeliness")
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<EntropyAttr> getTimeliness(@PathParam("id") final int id, @PathParam("sourceKey") String sourceKey) {
+        List<AnalysisResults> arl = this.getCohortAnalysesTimeliness(id, sourceKey);
+        
+        List<EntropyAttr> el = new ArrayList<EntropyAttr>();
+        
+        for (AnalysisResults ar : arl) {
+            EntropyAttr ea = new EntropyAttr();
+            ea.setDate(ar.getStratum1());
+            ea.setEntropy(Float.parseFloat(ar.getStratum2()));
+            el.add(ea);
+        }
+        
+        return el;
+    }
     
   protected PreparedStatementRenderer prepareGetExposureOutcomeCohortPredictors(
     ExposureCohortSearch search, Source source) {

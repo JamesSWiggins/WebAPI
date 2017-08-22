@@ -74,6 +74,7 @@
 --data completeness: race:      2011, 2012, 2013, 2014, 2015, 2016, 2017
 --data completeness: ethnicity: 2021, 2022, 2023, 2024, 2025, 2026, 2027
 --entropy: 2031, 2032
+--timeliness: 2051
 
 delete from @results_schema.HERACLES_results where cohort_definition_id IN (@cohort_definition_id) and analysis_id IN (@list_of_analysis_ids);
 delete from @results_schema.HERACLES_results_dist where cohort_definition_id IN (@cohort_definition_id) and analysis_id IN (@list_of_analysis_ids);
@@ -6614,6 +6615,37 @@ INSERT INTO @results_schema.HERACLES_results (cohort_definition_id,
                                  all_observ) value_day_cnt) with_sum) allProb
 GROUP BY care_site_id, site_source_value, obs_date
 ) entropyT;
+--}
+
+--{2051 IN (@list_of_analysis_ids)}?{
+-- 2051	timeliness 
+INSERT INTO @results_schema.HERACLES_results (cohort_definition_id,
+                              analysis_id,
+                              stratum_1,
+                              stratum_2)
+    SELECT @cohort_definition_id AS cohort_definition_id,
+          2051 AS analysis_id,
+          delayT.obs_date,
+		  cast(round(delayT.avg_delay_day, 2) as varchar(max))
+     FROM
+(
+	select with_diff_day.obs_date as obs_date, 
+	avg(with_diff_day.diff_day) as avg_delay_day
+	from
+	(
+	select  
+  	CAST(YEAR(all_observ.observation_date) as varchar(4)) + '-' + RIGHT('0' + RTRIM(MONTH(all_observ.observation_date)), 2) 
+  	+ '-' + RIGHT('0' + RTRIM(day(all_observ.observation_date)), 2) as obs_date, 
+		datediff(day, all_observ.observation_date, all_observ.row_created_db_time) as diff_day
+		from (
+			SELECT * FROM @CDM_schema.OBSERVATION observ 
+			join #HERACLES_cohort co 
+			on co.SUBJECT_ID = observ.PERSON_ID 
+			and observ.observation_date >= co.cohort_start_date 
+			and observ.observation_date <= co.cohort_end_date ) all_observ
+			) with_diff_day
+	group by with_diff_day.obs_date
+) delayT;
 --}
 
 TRUNCATE TABLE #HERACLES_cohort;
